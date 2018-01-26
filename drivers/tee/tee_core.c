@@ -995,6 +995,19 @@ int tee_client_invoke_func(struct tee_context *ctx,
 }
 EXPORT_SYMBOL_GPL(tee_client_invoke_func);
 
+static void enable_user_counters(void* data) {
+    uint32_t cntkctl;
+    unsigned long long ts;
+
+    pr_info( "Enabled Performance counters\n" );
+
+    asm volatile( "mrs %0, cntkctl_el1" : "=r" (cntkctl) );
+    cntkctl |= 1;
+    asm ( "msr cntkctl_el1, %0 \n\t" : : "r"(cntkctl) );
+    asm ( "mrs %0, cntpct_el0" : "=r" (ts) );
+    pr_info( "Enabled Physical Counters: %llu\n", ts );
+}
+
 static int __init tee_init(void)
 {
 	int rc;
@@ -1011,6 +1024,8 @@ static int __init tee_init(void)
 		class_destroy(tee_class);
 		tee_class = NULL;
 	}
+
+    on_each_cpu( enable_user_counters, NULL, 1 );
 
 	return rc;
 }

@@ -26,12 +26,13 @@
 #include <linux/tee_drv.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
+#include "optee_bench.h"
 #include "optee_private.h"
 #include "optee_smc.h"
 
 #define DRIVER_NAME "optee"
 
-#define OPTEE_SHM_NUM_PRIV_PAGES	1
+#define OPTEE_SHM_NUM_PRIV_PAGES	40
 
 /**
  * optee_from_msg_param() - convert from OPTEE_MSG parameters to
@@ -224,13 +225,14 @@ static void optee_release(struct tee_context *ctx)
 	if (!IS_ERR(shm)) {
 		arg = tee_shm_get_va(shm, 0);
 		/*
-		 * If va2pa fails for some reason, we can't call
-		 * optee_close_session(), only free the memory. Secure OS
-		 * will leak sessions and finally refuse more sessions, but
-		 * we will at least let normal world reclaim its memory.
+		 * If va2pa fails for some reason, we can't call into
+		 * secure world, only free the memory. Secure OS will leak
+		 * sessions and finally refuse more sessions, but we will
+		 * at least let normal world reclaim its memory.
 		 */
 		if (!IS_ERR(arg))
-			tee_shm_va2pa(shm, arg, &parg);
+			if (tee_shm_va2pa(shm, arg, &parg))
+				arg = NULL; /* prevent usage of parg below */
 	}
 
 	list_for_each_entry_safe(sess, sess_tmp, &ctxdata->sess_list,
@@ -240,7 +242,7 @@ static void optee_release(struct tee_context *ctx)
 			memset(arg, 0, sizeof(*arg));
 			arg->cmd = OPTEE_MSG_CMD_CLOSE_SESSION;
 			arg->session = sess->session_id;
-			optee_do_call_with_arg(ctx, parg);
+			optee_do_call_with_arg(ctx, parg, arg->cmd);
 		}
 		kfree(sess);
 	}
@@ -372,6 +374,8 @@ optee_config_shm_memremap(optee_invoke_fn *invoke_fn, void **memremaped_shm)
 	end = rounddown(res.result.start + res.result.size, PAGE_SIZE);
 	paddr = begin;
 	size = end - begin;
+
+    printk("[optee_config_shm_memremap]: size=%d, kernelsize=%d", size, OPTEE_SHM_NUM_PRIV_PAGES*PAGE_SIZE);
 
 	if (size < 2 * OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE) {
 		pr_err("too small shared memory area\n");
@@ -598,6 +602,8 @@ static int __init optee_driver_init(void)
 
 	optee_svc = optee;
 
+	optee_bm_enable();
+
 	return 0;
 }
 module_init(optee_driver_init);
@@ -609,6 +615,8 @@ static void __exit optee_driver_exit(void)
 	optee_svc = NULL;
 	if (optee)
 		optee_remove(optee);
+
+	optee_bm_disable();
 }
 module_exit(optee_driver_exit);
 

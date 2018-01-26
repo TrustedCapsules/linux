@@ -150,7 +150,8 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 
 	shm = kzalloc(sizeof(*shm), GFP_KERNEL);
 	if (!shm) {
-		ret = ERR_PTR(-ENOMEM);
+        printk("ERROR: Alloc out of memory\n");
+        ret = ERR_PTR(-ENOMEM);
 		goto err_dev_put;
 	}
 
@@ -164,7 +165,8 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 
 	rc = poolm->ops->alloc(poolm, shm, size);
 	if (rc) {
-		ret = ERR_PTR(rc);
+        printk("ERROR: pool ops alloc failed\n");
+        ret = ERR_PTR(rc);
 		goto err_kfree;
 	}
 
@@ -172,6 +174,7 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 	shm->id = idr_alloc(&teedev->idr, shm, 1, 0, GFP_KERNEL);
 	mutex_unlock(&teedev->mutex);
 	if (shm->id < 0) {
+        printk("ERROR: idr_alloc failed\n");
 		ret = ERR_PTR(shm->id);
 		goto err_pool_free;
 	}
@@ -186,6 +189,7 @@ struct tee_shm *tee_shm_alloc(struct tee_context *ctx, size_t size, u32 flags)
 
 		shm->dmabuf = dma_buf_export(&exp_info);
 		if (IS_ERR(shm->dmabuf)) {
+            printk("ERROR: dma_buf_export failed\n");
 			ret = ERR_CAST(shm->dmabuf);
 			goto err_rem;
 		}
@@ -320,6 +324,7 @@ int tee_shm_get_fd(struct tee_shm *shm)
 		get_dma_buf(shm->dmabuf);
 	return fd;
 }
+EXPORT_SYMBOL_GPL(tee_shm_get_fd);
 
 /**
  * tee_shm_free() - Free shared memory
@@ -418,8 +423,10 @@ EXPORT_SYMBOL_GPL(tee_shm_get_va);
  */
 int tee_shm_get_pa(struct tee_shm *shm, size_t offs, phys_addr_t *pa)
 {
-	if (offs >= shm->size)
-		return -EINVAL;
+	if (offs >= shm->size) {
+	    printk("[tee_shm_get_pa]: error %d >= %d", offs, shm->size);
+        return -EINVAL;
+    }
 	if (pa)
 		*pa = shm->paddr + offs;
 	return 0;

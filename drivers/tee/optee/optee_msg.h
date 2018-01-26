@@ -415,4 +415,22 @@ struct optee_msg_arg {
  */
 #define OPTEE_MSG_RPC_CMD_SHM_FREE	7
 
+/*
+ * Register timestamp buffer
+ *
+ * [in] param[0].u.value.a	Subcommand (register buffer, unregister buffer)
+ * [in] param[0].u.value.b	Physical address of timestamp buffer
+ * [in] param[0].u.value.c	Size of buffer
+ */
+#define OPTEE_MSG_RPC_CMD_BENCH_REG	20
+
+/*
+ * Network access
+ */
+#define OPTEE_MSG_RPC_CMD_NETWORK 	11
+
+/*
+ * GPS Access
+ */
+#define OPTEE_MSG_RPC_CMD_GET_GPS	12
 #endif /* _OPTEE_MSG_H */
